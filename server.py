@@ -151,6 +151,7 @@ async def _schedule_cleanup(room: Room):
 async def room_ws(ws: WebSocket, room_code: str, name: str = "Anonymous"):
     room = room_manager.get(room_code)
     if not room:
+        await ws.accept()
         await ws.close(code=4404)
         return
 
@@ -403,5 +404,9 @@ async def _stream_upload(file: UploadFile, dest: Path) -> None:
             out.write(chunk)
 
 
+@app.get("/")
+async def index_page():
+    return FileResponse(STATIC_DIR / "index.html")
+
+
 app.mount("/music", StaticFiles(directory=str(MUSIC_DIR)), name="music")
-app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")

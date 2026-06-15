@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MP3Sync — Room</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--surface3:#282c40;
+  --border:rgba(255,255,255,.08);--accent:#6c6fff;--accent-h:#8585ff;
+  --text:#e8eaf6;--muted:#8a8fa8;--danger:#f44336;--success:#4caf50;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── NAME MODAL ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px)}
+.overlay.hidden{display:none}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:36px 32px;width:100%;max-width:380px;text-align:center}
+.modal h2{font-size:20px;font-weight:700;margin-bottom:6px}
+.modal .sub{color:var(--muted);font-size:14px;margin-bottom:24px}
+.modal .room-code-display{font-family:'Courier New',monospace;font-size:30px;font-weight:800;letter-spacing:.15em;color:var(--accent);margin-bottom:20px}
+.name-inp{background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:16px;outline:none;padding:12px 16px;text-align:center;width:100%;transition:border-color .15s;font-family:inherit}
+.name-inp:focus{border-color:var(--accent)}
+.btn-enter{background:var(--accent);border:none;border-radius:10px;color:#fff;cursor:pointer;font-family:inherit;font-size:15px;font-weight:600;margin-top:14px;padding:12px;width:100%;transition:background .15s}
+.btn-enter:hover{background:var(--accent-h)}
+
+/* ── HEADER ── */
+header{height:52px;padding:0 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.back-link{color:var(--muted);font-size:13px;font-weight:600;text-decoration:none;transition:color .15s;white-space:nowrap}
+.back-link:hover{color:var(--text)}
+.logo{font-size:17px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.logo-mark{color:var(--accent)}
+.room-pill{background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;gap:8px;padding:5px 12px;margin-left:4px}
+.room-pill-label{color:var(--muted);font-size:11px;font-weight:600}
+.room-pill-code{font-family:'Courier New',monospace;font-size:15px;font-weight:800;letter-spacing:.1em;color:var(--accent)}
+.copy-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0;transition:color .15s;line-height:1}
+.copy-btn:hover{color:var(--text)}
+.h-spacer{flex:1}
+.h-chip{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.dot.live{background:var(--success)}
+.dot.dead{background:var(--danger)}
+.status-text{font-size:12px;font-weight:600}
+
+/* ── LAYOUT ── */
+.layout{flex:1;display:flex;min-height:0}
+
+/* ── SIDEBAR ── */
+.sidebar{width:280px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+.users-panel{padding:12px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.users-panel-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px}
+.user-list{display:flex;flex-direction:column;gap:4px;max-height:100px;overflow-y:auto}
+.user-item{font-size:13px;color:var(--text);padding:3px 6px;border-radius:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-item.me{background:rgba(108,111,255,.12);color:var(--accent);font-weight:600}
+.stabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.stab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);cursor:pointer;flex:1;font-family:inherit;font-size:13px;font-weight:600;padding:10px;transition:color .15s,border-color .15s}
+.stab.active{color:var(--text);border-bottom-color:var(--accent)}
+.track-list{flex:1;overflow-y:auto;padding:8px 0}
+.track-item{align-items:center;cursor:pointer;display:flex;gap:8px;padding:7px 14px;transition:background .12s}
+.track-item:hover{background:var(--surface2)}
+.track-item.active{background:rgba(108,111,255,.12)}
+.track-item.active .track-name{color:var(--accent)}
+.track-num{color:var(--muted);font-size:11px;min-width:20px;text-align:right}
+.track-name{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.track-size{color:var(--muted);font-size:11px}
+.track-del{background:none;border:none;color:transparent;cursor:pointer;font-size:14px;padding:2px 4px;transition:color .15s}
+.track-item:hover .track-del{color:var(--muted)}
+.track-del:hover{color:var(--danger)!important}
+.pl-item{align-items:center;cursor:pointer;display:flex;gap:10px;padding:9px 14px;transition:background .12s}
+.pl-item:hover{background:var(--surface2)}
+.pl-item.active{background:rgba(108,111,255,.12)}
+.pl-icon{color:var(--accent);font-size:16px}
+.pl-name{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-count{color:var(--muted);font-size:11px}
+.pl-del{background:none;border:none;color:transparent;cursor:pointer;font-size:14px;padding:2px 4px;transition:color .15s}
+.pl-item:hover .pl-del{color:var(--muted)}
+.pl-del:hover{color:var(--danger)!important}
+.pl-detail-header{align-items:center;border-bottom:1px solid var(--border);display:flex;gap:8px;padding:10px 14px}
+.pl-back{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:0;transition:color .15s}
+.pl-back:hover{color:var(--text)}
+.pl-detail-name{flex:1;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-upload-btn{background:var(--surface3);border:none;border-radius:7px;color:var(--text);cursor:pointer;font-size:12px;font-weight:600;padding:5px 10px;transition:background .15s;white-space:nowrap}
+.pl-upload-btn:hover{background:var(--accent)}
+.sidebar-actions{border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;flex-shrink:0}
+.sa-btn{background:var(--surface2);border:none;border-radius:8px;color:var(--text);cursor:pointer;flex:1;font-family:inherit;font-size:12px;font-weight:600;padding:8px;transition:background .15s}
+.sa-btn:hover{background:var(--surface3)}
+.empty-state{color:var(--muted);font-size:13px;padding:32px 20px;text-align:center}
+
+/* ── PLAYER PANE ── */
+.player-pane{flex:1;display:flex;flex-direction:column;min-width:0}
+.now-playing{border-bottom:1px solid var(--border);flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 40px;min-height:0}
+.np-source{color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;height:16px}
+.np-title{font-size:22px;font-weight:700;letter-spacing:-.3px;text-align:center;margin-bottom:4px;max-width:500px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.np-idle{color:var(--muted);font-size:15px}
+.progress-wrap{margin:24px 0 10px;width:100%;max-width:480px}
+.progress-bar{-webkit-appearance:none;appearance:none;background:var(--surface2);border-radius:4px;cursor:pointer;height:5px;outline:none;width:100%}
+.progress-bar::-webkit-slider-thumb{-webkit-appearance:none;background:var(--accent);border-radius:50%;height:14px;width:14px;cursor:pointer}
+.progress-bar::-moz-range-thumb{background:var(--accent);border:none;border-radius:50%;height:14px;width:14px;cursor:pointer}
+.time-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:28px;width:100%;max-width:480px}
+.controls{display:flex;align-items:center;gap:16px}
+.ctrl-btn{background:none;border:none;color:var(--text);cursor:pointer;font-size:28px;line-height:1;padding:4px;transition:color .15s,transform .1s;opacity:.7}
+.ctrl-btn:hover{color:var(--accent);opacity:1}
+.ctrl-btn:active{transform:scale(.9)}
+.ctrl-btn.play{font-size:40px;opacity:1}
+.ctrl-btn:disabled{opacity:.25;cursor:not-allowed}
+.vol-row{align-items:center;display:flex;gap:10px;margin-top:20px}
+.vol-icon{color:var(--muted);font-size:16px;cursor:pointer}
+.vol-bar{-webkit-appearance:none;appearance:none;background:var(--surface2);border-radius:4px;cursor:pointer;height:4px;outline:none;width:100px}
+.vol-bar::-webkit-slider-thumb{-webkit-appearance:none;background:var(--muted);border-radius:50%;height:12px;width:12px}
+.vol-bar::-moz-range-thumb{background:var(--muted);border:none;border-radius:50%;height:12px;width:12px}
+
+/* ── ACTIVITY LOG ── */
+.activity{border-top:1px solid var(--border);height:120px;overflow-y:auto;padding:8px 16px;flex-shrink:0}
+.activity-label{color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:4px 0 6px}
+.log-entry{color:var(--muted);font-size:12px;padding:2px 0;border-bottom:none}
+
+/* ── UPLOAD MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(3px)}
+.modal-overlay.hidden{display:none}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:420px}
+.modal-title{font-size:17px;font-weight:700;margin-bottom:20px}
+.form-row{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.form-label{color:var(--muted);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+.form-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:14px;outline:none;padding:10px 12px;transition:border-color .15s}
+.form-input:focus{border-color:var(--accent)}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:4px}
+.btn-sm{border:none;border-radius:8px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;padding:9px 18px;transition:background .15s}
+.btn-sm.primary{background:var(--accent);color:#fff}
+.btn-sm.primary:hover{background:var(--accent-h)}
+.btn-sm.cancel{background:var(--surface2);color:var(--text)}
+.btn-sm.cancel:hover{background:var(--surface3)}
+.upload-progress{color:var(--muted);font-size:13px;margin-top:10px;min-height:20px}
+</style>
+</head>
+<body>
+
+<!-- NAME MODAL -->
+<div class="overlay" id="nameOverlay">
+  <div class="modal">
+    <h2>Join Room</h2>
+    <div class="room-code-display" id="nameModalCode">------</div>
+    <div class="sub">What should others call you?</div>
+    <input class="name-inp" id="nameInp" type="text" placeholder="Your name…" maxlength="32" autocomplete="off">
+    <button class="btn-enter" id="enterBtn" onclick="enterRoom()">Enter Room →</button>
+  </div>
+</div>
+
+<!-- UPLOAD MODAL (library) -->
+<div class="modal-overlay hidden" id="uploadModal">
+  <div class="modal-box">
+    <div class="modal-title">Upload to Library</div>
+    <div class="form-row">
+      <div class="form-label">Audio files</div>
+      <input class="form-input" type="file" id="libFileInput" multiple
+        accept=".mp3,.m4a,.aac,.ogg,.opus,.wav,.flac,.webm">
+    </div>
+    <div class="form-row">
+      <div class="form-label">Or upload a folder</div>
+      <input class="form-input" type="file" id="libFolderInput" webkitdirectory multiple
+        accept=".mp3,.m4a,.aac,.ogg,.opus,.wav,.flac,.webm">
+    </div>
+    <div class="upload-progress" id="libProgress"></div>
+    <div class="modal-actions">
+      <button class="btn-sm cancel" onclick="closeModal('uploadModal')">Cancel</button>
+      <button class="btn-sm primary" onclick="doLibUpload()">Upload</button>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE PLAYLIST MODAL -->
+<div class="modal-overlay hidden" id="createPlModal">
+  <div class="modal-box">
+    <div class="modal-title">Create Playlist</div>
+    <div class="form-row">
+      <div class="form-label">Name</div>
+      <input class="form-input" type="text" id="newPlName" placeholder="My Playlist" maxlength="80" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-sm cancel" onclick="closeModal('createPlModal')">Cancel</button>
+      <button class="btn-sm primary" onclick="doCreatePlaylist()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- UPLOAD TO PLAYLIST MODAL -->
+<div class="modal-overlay hidden" id="plUploadModal">
+  <div class="modal-box">
+    <div class="modal-title">Upload to "<span id="plUploadName"></span>"</div>
+    <div class="form-row">
+      <div class="form-label">Audio files</div>
+      <input class="form-input" type="file" id="plFileInput" multiple
+        accept=".mp3,.m4a,.aac,.ogg,.opus,.wav,.flac,.webm">
+    </div>
+    <div class="form-row">
+      <div class="form-label">Or upload a folder</div>
+      <input class="form-input" type="file" id="plFolderInput" webkitdirectory multiple
+        accept=".mp3,.m4a,.aac,.ogg,.opus,.wav,.flac,.webm">
+    </div>
+    <div class="upload-progress" id="plProgress"></div>
+    <div class="modal-actions">
+      <button class="btn-sm cancel" onclick="closeModal('plUploadModal')">Cancel</button>
+      <button class="btn-sm primary" onclick="doPlUpload()">Upload</button>
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <a href="/" class="back-link">← Lobby</a>
+  <div class="logo"><span class="logo-mark">♫</span> MP3Sync</div>
+  <div class="room-pill">
+    <span class="room-pill-label">Room</span>
+    <span class="room-pill-code" id="headerCode">------</span>
+    <button class="copy-btn" onclick="copyCode()" title="Copy room code">⧉</button>
+  </div>
+  <div class="h-spacer"></div>
+  <div class="h-chip">
+    <div class="dot" id="connDot"></div>
+    <span class="status-text" id="connStatus">Connecting…</span>
+  </div>
+  <div class="h-chip" style="margin-left:12px">
+    <span>👤</span>
+    <span id="listenerCount">0</span>
+  </div>
+</header>
+
+<!-- MAIN LAYOUT -->
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="users-panel">
+      <div class="users-panel-label">In this room</div>
+      <div class="user-list" id="userList">
+        <div class="user-item" style="color:var(--muted)">Connecting…</div>
+      </div>
+    </div>
+
+    <div class="stabs">
+      <button class="stab active" id="tabLib" onclick="switchTab('library')">Library</button>
+      <button class="stab" id="tabPl" onclick="switchTab('playlists')">Playlists</button>
+    </div>
+
+    <!-- Library view -->
+    <div id="viewLibrary" class="track-list"></div>
+
+    <!-- Playlists list view -->
+    <div id="viewPlaylists" class="track-list" style="display:none"></div>
+
+    <!-- Playlist detail view -->
+    <div id="viewPlDetail" style="display:none;flex:1;overflow:hidden;display:none;flex-direction:column">
+      <div class="pl-detail-header">
+        <button class="pl-back" onclick="backToPlaylists()">‹</button>
+        <span class="pl-detail-name" id="plDetailName"></span>
+        <button class="pl-upload-btn" onclick="openPlUpload()">+ Upload</button>
+      </div>
+      <div class="track-list" id="plDetailTracks" style="flex:1;overflow-y:auto"></div>
+    </div>
+
+    <div class="sidebar-actions">
+      <button class="sa-btn" id="libTabBtn" onclick="openModal('uploadModal')" style="display:none">⬆ Upload</button>
+      <button class="sa-btn" id="plTabBtn" onclick="openModal('createPlModal')" style="display:none">＋ New Playlist</button>
+    </div>
+  </aside>
+
+  <!-- PLAYER PANE -->
+  <div class="player-pane">
+    <div class="now-playing">
+      <div class="np-source" id="npSource"></div>
+      <div class="np-title np-idle" id="npTitle">No track selected</div>
+
+      <div class="progress-wrap">
+        <input class="progress-bar" type="range" id="progressBar" min="0" max="100" value="0" step="0.1">
+      </div>
+      <div class="time-row">
+        <span id="timeElapsed">0:00</span>
+        <span id="timeDuration">0:00</span>
+      </div>
+
+      <div class="controls">
+        <button class="ctrl-btn" id="prevBtn" onclick="prevTrack()" title="Previous" disabled>⏮</button>
+        <button class="ctrl-btn play" id="playBtn" onclick="togglePlay()" title="Play/Pause" disabled>▶</button>
+        <button class="ctrl-btn" id="nextBtn" onclick="nextTrack()" title="Next" disabled>⏭</button>
+      </div>
+
+      <div class="vol-row">
+        <span class="vol-icon" onclick="toggleMute()">🔊</span>
+        <input class="vol-bar" type="range" id="volBar" min="0" max="1" step="0.02" value="1">
+      </div>
+    </div>
+
+    <div class="activity" id="activityLog">
+      <div class="activity-label">Activity</div>
+    </div>
+  </div>
+</div>
+
+<audio id="audio" preload="metadata"></audio>
+
+<script>
+// ── GLOBALS ──────────────────────────────────────────────────────────────────
+const roomCode = location.pathname.split('/').filter(Boolean).pop() || '';
+let myName = '';
+let ws = null;
+let wsRetry = 0;
+let seeking = false;
+let muted = false;
+let prevVol = 1;
+
+// Track state
+let libTracks = [];
+let playlists = [];
+let plDetailTracks = [];
+let currentPlName = null;   // playlist name open in detail view
+let currentSource = null;   // null=library or playlist name
+let currentTrack = null;    // filename
+let activeTab = 'library';  // 'library' | 'playlists'
+
+const audio = document.getElementById('audio');
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+document.getElementById('nameModalCode').textContent = roomCode;
+document.getElementById('headerCode').textContent = roomCode;
+
+const savedName = localStorage.getItem('mp3sync_name');
+if (savedName) {
+  myName = savedName;
+  document.getElementById('nameOverlay').classList.add('hidden');
+  init();
+} else {
+  document.getElementById('nameInp').focus();
+}
+
+document.getElementById('nameInp').addEventListener('keydown', e => {
+  if (e.key === 'Enter') enterRoom();
+});
+
+function enterRoom() {
+  const val = document.getElementById('nameInp').value.trim();
+  myName = val || 'Anonymous';
+  localStorage.setItem('mp3sync_name', myName);
+  document.getElementById('nameOverlay').classList.add('hidden');
+  init();
+}
+
+function init() {
+  loadLibrary();
+  loadPlaylists();
+  connectWS();
+}
+
+// ── WEBSOCKET ─────────────────────────────────────────────────────────────────
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws/${roomCode}?name=${encodeURIComponent(myName)}`);
+
+  ws.onopen = () => {
+    wsRetry = 0;
+    setConnStatus(true);
+    log(`Connected as ${myName}`);
+  };
+
+  ws.onclose = e => {
+    setConnStatus(false);
+    if (e.code === 4404) {
+      log('Room not found or expired. Returning to lobby…');
+      setTimeout(() => { location.href = '/?error=expired'; }, 2000);
+      return;
+    }
+    if (e.code === 4001) {
+      log('Room was closed.');
+      setTimeout(() => { location.href = '/'; }, 2000);
+      return;
+    }
+    const delay = Math.min(10000, 1000 * Math.pow(1.5, wsRetry++));
+    log(`Disconnected — reconnecting in ${Math.round(delay/1000)}s…`);
+    setTimeout(connectWS, delay);
+  };
+
+  ws.onerror = () => {};
+
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    switch (msg.type) {
+      case 'sync':            applySync(msg.state); break;
+      case 'event':           log(msg.message); break;
+      case 'users':           updateUsers(msg.count, msg.names); break;
+      case 'tracks_updated':  loadLibrary(); break;
+      case 'playlists_updated': loadPlaylists(); break;
+      case 'playlist_updated':
+        loadPlaylists();
+        if (currentPlName === msg.name) loadPlDetail(msg.name);
+        break;
+    }
+  };
+}
+
+function send(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+}
+
+function setConnStatus(connected) {
+  document.getElementById('connDot').className = 'dot ' + (connected ? 'live' : 'dead');
+  document.getElementById('connStatus').textContent = connected ? 'Live' : 'Offline';
+}
+
+// ── SYNC ──────────────────────────────────────────────────────────────────────
+function applySync(state) {
+  const trackChanged = state.track !== currentTrack || state.source !== currentSource;
+
+  if (trackChanged) {
+    currentTrack = state.track;
+    currentSource = state.source;
+    if (state.track) {
+      const url = state.source
+        ? `/music/_playlists/${encodeURIComponent(state.source)}/${encodeURIComponent(state.track)}`
+        : `/music/${encodeURIComponent(state.track)}`;
+      audio.src = url;
+      audio.load();
+      updateNowPlaying(state.track, state.source);
+      highlightActive();
+    } else {
+      audio.src = '';
+      updateNowPlaying(null, null);
+      highlightActive();
+    }
+  }
+
+  if (state.track) {
+    const targetPos = state.position + (Date.now() / 1000 - state.server_time);
+    if (!seeking && Math.abs(audio.currentTime - targetPos) > 1.5) {
+      audio.currentTime = Math.max(0, targetPos);
+    }
+    if (state.playing) {
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+    }
+    document.getElementById('playBtn').textContent = state.playing ? '⏸' : '▶';
+    document.getElementById('playBtn').disabled = false;
+    document.getElementById('prevBtn').disabled = false;
+    document.getElementById('nextBtn').disabled = false;
+  }
+}
+
+function updateNowPlaying(track, source) {
+  document.getElementById('npSource').textContent = source ? `📁 ${source}` : (track ? 'Library' : '');
+  const titleEl = document.getElementById('npTitle');
+  if (track) {
+    titleEl.textContent = track.replace(/\.[^.]+$/, '');
+    titleEl.classList.remove('np-idle');
+  } else {
+    titleEl.textContent = 'No track selected';
+    titleEl.classList.add('np-idle');
+  }
+}
+
+function highlightActive() {
+  document.querySelectorAll('.track-item').forEach(el => {
+    el.classList.toggle('active',
+      el.dataset.track === currentTrack && el.dataset.source === (currentSource || ''));
+  });
+}
+
+// ── USERS ─────────────────────────────────────────────────────────────────────
+function updateUsers(count, names) {
+  document.getElementById('listenerCount').textContent = count;
+  const ul = document.getElementById('userList');
+  if (!names || !names.length) {
+    ul.innerHTML = '<div class="user-item" style="color:var(--muted)">No one here</div>';
+    return;
+  }
+  ul.innerHTML = names.map(n =>
+    `<div class="user-item ${n === myName ? 'me' : ''}">${esc(n)}${n === myName ? ' (you)' : ''}</div>`
+  ).join('');
+}
+
+// ── AUDIO EVENTS ──────────────────────────────────────────────────────────────
+audio.addEventListener('timeupdate', () => {
+  if (!seeking && isFinite(audio.duration) && audio.duration > 0) {
+    const pct = (audio.currentTime / audio.duration) * 100;
+    document.getElementById('progressBar').value = pct;
+    document.getElementById('timeElapsed').textContent = fmt(audio.currentTime);
+  }
+});
+
+audio.addEventListener('loadedmetadata', () => {
+  document.getElementById('timeDuration').textContent = fmt(audio.duration);
+  document.getElementById('progressBar').max = 100;
+});
+
+audio.addEventListener('ended', () => {
+  nextTrack();
+});
+
+const progressBar = document.getElementById('progressBar');
+progressBar.addEventListener('mousedown', () => { seeking = true; });
+progressBar.addEventListener('touchstart', () => { seeking = true; });
+progressBar.addEventListener('input', () => {
+  if (isFinite(audio.duration)) {
+    audio.currentTime = (progressBar.value / 100) * audio.duration;
+    document.getElementById('timeElapsed').textContent = fmt(audio.currentTime);
+  }
+});
+progressBar.addEventListener('change', () => {
+  seeking = false;
+  send({ type: 'seek', position: audio.currentTime });
+});
+
+const volBar = document.getElementById('volBar');
+volBar.addEventListener('input', () => {
+  audio.volume = volBar.value;
+  muted = audio.volume === 0;
+});
+
+function toggleMute() {
+  if (muted) {
+    audio.volume = prevVol || 1;
+    volBar.value = audio.volume;
+    muted = false;
+  } else {
+    prevVol = audio.volume;
+    audio.volume = 0;
+    volBar.value = 0;
+    muted = true;
+  }
+}
+
+// ── CONTROLS ──────────────────────────────────────────────────────────────────
+function togglePlay() {
+  if (!currentTrack) return;
+  if (audio.paused) {
+    audio.play().catch(() => {});
+    send({ type: 'play', position: audio.currentTime });
+  } else {
+    audio.pause();
+    send({ type: 'pause', position: audio.currentTime });
+  }
+}
+
+function selectTrack(name, source) {
+  currentTrack = name;
+  currentSource = source;
+  const url = source
+    ? `/music/_playlists/${encodeURIComponent(source)}/${encodeURIComponent(name)}`
+    : `/music/${encodeURIComponent(name)}`;
+  audio.src = url;
+  audio.load();
+  audio.play().catch(() => {});
+  updateNowPlaying(name, source);
+  highlightActive();
+  send({ type: 'track', track: name, source: source });
+  document.getElementById('playBtn').disabled = false;
+  document.getElementById('prevBtn').disabled = false;
+  document.getElementById('nextBtn').disabled = false;
+}
+
+function prevTrack() {
+  const list = activeTrackList();
+  const idx = list.findIndex(t => t.name === currentTrack);
+  if (idx > 0) selectTrack(list[idx - 1].name, currentSource);
+}
+
+function nextTrack() {
+  const list = activeTrackList();
+  const idx = list.findIndex(t => t.name === currentTrack);
+  if (idx >= 0 && idx < list.length - 1) selectTrack(list[idx + 1].name, currentSource);
+}
+
+function activeTrackList() {
+  if (currentSource) return plDetailTracks;
+  return libTracks;
+}
+
+// ── LIBRARY ───────────────────────────────────────────────────────────────────
+async function loadLibrary() {
+  try {
+    const r = await fetch('/api/tracks');
+    libTracks = await r.json();
+    renderLibrary();
+  } catch {}
+}
+
+function renderLibrary() {
+  const el = document.getElementById('viewLibrary');
+  if (!libTracks.length) {
+    el.innerHTML = '<div class="empty-state">No tracks yet.<br>Upload some files below.</div>';
+    return;
+  }
+  el.innerHTML = libTracks.map((t, i) =>
+    `<div class="track-item" data-track="${esc(t.name)}" data-source=""
+          onclick="selectTrack('${escQ(t.name)}', null)">
+      <span class="track-num">${i + 1}</span>
+      <span class="track-name" title="${esc(t.name)}">${esc(t.name.replace(/\.[^.]+$/, ''))}</span>
+      <span class="track-size">${t.size_mb}MB</span>
+      <button class="track-del" onclick="event.stopPropagation();delTrack('${escQ(t.name)}')" title="Delete">✕</button>
+    </div>`
+  ).join('');
+  highlightActive();
+}
+
+async function delTrack(name) {
+  if (!confirm(`Delete "${name}" from library?`)) return;
+  await fetch('/api/tracks/' + encodeURIComponent(name), { method: 'DELETE' });
+}
+
+// ── PLAYLISTS ─────────────────────────────────────────────────────────────────
+async function loadPlaylists() {
+  try {
+    const r = await fetch('/api/playlists');
+    playlists = await r.json();
+    renderPlaylists();
+  } catch {}
+}
+
+function renderPlaylists() {
+  const el = document.getElementById('viewPlaylists');
+  if (!playlists.length) {
+    el.innerHTML = '<div class="empty-state">No playlists yet.<br>Create one below.</div>';
+    return;
+  }
+  el.innerHTML = playlists.map(p =>
+    `<div class="pl-item ${currentSource === p.name ? 'active' : ''}"
+          onclick="openPlDetail('${escQ(p.name)}')">
+      <span class="pl-icon">📁</span>
+      <span class="pl-name">${esc(p.name)}</span>
+      <span class="pl-count">${p.count}</span>
+      <button class="pl-del" onclick="event.stopPropagation();delPlaylist('${escQ(p.name)}')" title="Delete">✕</button>
+    </div>`
+  ).join('');
+}
+
+async function openPlDetail(name) {
+  currentPlName = name;
+  document.getElementById('plDetailName').textContent = name;
+  document.getElementById('plUploadName').textContent = name;
+  document.getElementById('viewPlaylists').style.display = 'none';
+  document.getElementById('viewPlDetail').style.display = 'flex';
+  document.getElementById('plTabBtn').style.display = 'none';
+  await loadPlDetail(name);
+}
+
+async function loadPlDetail(name) {
+  try {
+    const r = await fetch('/api/playlists/' + encodeURIComponent(name));
+    plDetailTracks = await r.json();
+    renderPlDetail();
+  } catch {}
+}
+
+function renderPlDetail() {
+  const el = document.getElementById('plDetailTracks');
+  if (!plDetailTracks.length) {
+    el.innerHTML = '<div class="empty-state">No tracks in this playlist.<br>Upload some files above.</div>';
+    return;
+  }
+  el.innerHTML = plDetailTracks.map((t, i) =>
+    `<div class="track-item" data-track="${esc(t.name)}" data-source="${esc(currentPlName)}"
+          onclick="selectTrack('${escQ(t.name)}', '${escQ(currentPlName)}')">
+      <span class="track-num">${i + 1}</span>
+      <span class="track-name" title="${esc(t.name)}">${esc(t.name.replace(/\.[^.]+$/, ''))}</span>
+      <span class="track-size">${t.size_mb}MB</span>
+      <button class="track-del" onclick="event.stopPropagation();delPlTrack('${escQ(currentPlName)}','${escQ(t.name)}')" title="Delete">✕</button>
+    </div>`
+  ).join('');
+  highlightActive();
+}
+
+function backToPlaylists() {
+  currentPlName = null;
+  document.getElementById('viewPlaylists').style.display = '';
+  document.getElementById('viewPlDetail').style.display = 'none';
+  document.getElementById('plTabBtn').style.display = '';
+}
+
+async function doCreatePlaylist() {
+  const name = document.getElementById('newPlName').value.trim();
+  if (!name) return;
+  try {
+    const r = await fetch('/api/playlists', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    if (!r.ok) { alert(await r.text()); return; }
+    closeModal('createPlModal');
+    document.getElementById('newPlName').value = '';
+    await loadPlaylists();
+    openPlDetail(name);
+  } catch (e) { alert(e.message); }
+}
+
+async function delPlaylist(name) {
+  if (!confirm(`Delete playlist "${name}" and all its tracks?`)) return;
+  await fetch('/api/playlists/' + encodeURIComponent(name), { method: 'DELETE' });
+}
+
+async function delPlTrack(playlist, filename) {
+  if (!confirm(`Delete "${filename}" from playlist?`)) return;
+  await fetch(`/api/playlists/${encodeURIComponent(playlist)}/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+}
+
+// ── UPLOAD ────────────────────────────────────────────────────────────────────
+async function doLibUpload() {
+  const files = [...(document.getElementById('libFileInput').files),
+                 ...(document.getElementById('libFolderInput').files)]
+    .filter(f => isAudio(f.name))
+    .sort((a, b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath, undefined, {numeric:true}));
+  if (!files.length) { alert('No audio files selected'); return; }
+  const prog = document.getElementById('libProgress');
+  for (let i = 0; i < files.length; i++) {
+    prog.textContent = `Uploading ${i + 1}/${files.length}: ${files[i].name}…`;
+    const fd = new FormData();
+    fd.append('file', files[i]);
+    const r = await fetch('/api/upload', { method: 'POST', body: fd });
+    if (!r.ok) { prog.textContent = `Error: ${await r.text()}`; return; }
+  }
+  prog.textContent = `Done! Uploaded ${files.length} file(s).`;
+  setTimeout(() => closeModal('uploadModal'), 1200);
+}
+
+function openPlUpload() {
+  openModal('plUploadModal');
+  document.getElementById('plUploadName').textContent = currentPlName;
+}
+
+async function doPlUpload() {
+  const name = currentPlName;
+  if (!name) return;
+  const files = [...(document.getElementById('plFileInput').files),
+                 ...(document.getElementById('plFolderInput').files)]
+    .filter(f => isAudio(f.name))
+    .sort((a, b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath, undefined, {numeric:true}));
+  if (!files.length) { alert('No audio files selected'); return; }
+  const prog = document.getElementById('plProgress');
+  for (let i = 0; i < files.length; i++) {
+    prog.textContent = `Uploading ${i + 1}/${files.length}: ${files[i].name}…`;
+    const fd = new FormData();
+    fd.append('file', files[i]);
+    const r = await fetch(`/api/playlists/${encodeURIComponent(name)}/upload`, { method: 'POST', body: fd });
+    if (!r.ok) { prog.textContent = `Error: ${await r.text()}`; return; }
+  }
+  prog.textContent = `Done! Uploaded ${files.length} file(s).`;
+  setTimeout(() => closeModal('plUploadModal'), 1200);
+}
+
+function isAudio(name) {
+  return /\.(mp3|m4a|aac|ogg|opus|wav|flac|webm)$/i.test(name);
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('tabLib').classList.toggle('active', tab === 'library');
+  document.getElementById('tabPl').classList.toggle('active', tab === 'playlists');
+  document.getElementById('viewLibrary').style.display = tab === 'library' ? '' : 'none';
+  document.getElementById('libTabBtn').style.display = tab === 'library' ? '' : 'none';
+
+  if (tab === 'playlists') {
+    if (currentPlName) {
+      document.getElementById('viewPlDetail').style.display = 'flex';
+      document.getElementById('viewPlaylists').style.display = 'none';
+      document.getElementById('plTabBtn').style.display = 'none';
+    } else {
+      document.getElementById('viewPlaylists').style.display = '';
+      document.getElementById('viewPlDetail').style.display = 'none';
+      document.getElementById('plTabBtn').style.display = '';
+    }
+  } else {
+    document.getElementById('viewPlaylists').style.display = 'none';
+    document.getElementById('viewPlDetail').style.display = 'none';
+    document.getElementById('plTabBtn').style.display = 'none';
+  }
+}
+
+// ── MODAL HELPERS ─────────────────────────────────────────────────────────────
+function openModal(id) {
+  document.getElementById(id).classList.remove('hidden');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.add('hidden');
+  if (id === 'uploadModal') {
+    document.getElementById('libFileInput').value = '';
+    document.getElementById('libFolderInput').value = '';
+    document.getElementById('libProgress').textContent = '';
+  }
+  if (id === 'plUploadModal') {
+    document.getElementById('plFileInput').value = '';
+    document.getElementById('plFolderInput').value = '';
+    document.getElementById('plProgress').textContent = '';
+  }
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function fmt(s) {
+  if (!isFinite(s)) return '0:00';
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, '0')}`;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escQ(s) {
+  return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+}
+
+function log(msg) {
+  const box = document.getElementById('activityLog');
+  const el = document.createElement('div');
+  el.className = 'log-entry';
+  el.textContent = msg;
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+
+function copyCode() {
+  navigator.clipboard.writeText(roomCode).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = '✓';
+    setTimeout(() => btn.textContent = '⧉', 1500);
+  });
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) closeModal(el.id); });
+});
+
+// Init sidebar state
+switchTab('library');
+</script>
+</body>
+</html>
