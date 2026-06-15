@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from starlette.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 BASE_DIR = Path(__file__).parent
@@ -247,6 +247,8 @@ async def delete_room(code: str):
 
 @app.get("/room/{code}")
 async def room_page(code: str):
+    if room_manager.get(code) is None:
+        raise HTTPException(404, "Room not found or has expired")
     return FileResponse(STATIC_DIR / "room.html")
 
 
